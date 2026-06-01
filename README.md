@@ -2,9 +2,9 @@
 
 Sources:
 
-https://docs.rke2.io/install/quickstart
-https://etcd.io/docs/v3.5/install/
-https://medium.com/devopsturkiye/etcd-cluster-kurulumu-ve-backup-restore-i%CC%87%C5%9Flemleri-009f4696be1f
+- https://docs.rke2.io/install/quickstart
+- https://etcd.io/docs/v3.5/install/
+- https://medium.com/devopsturkiye/etcd-cluster-kurulumu-ve-backup-restore-i%CC%87%C5%9Flemleri-009f4696be1f
 
 ## What This Project Does
 
