@@ -1,11 +1,5 @@
 # RKE2 + External etcd HA Cluster — Full Setup Guide
 
-Sources:
-
-https://docs.rke2.io/install/quickstart
-https://etcd.io/docs/v3.5/install/
-https://medium.com/devopsturkiye/etcd-cluster-kurulumu-ve-backup-restore-i%CC%87%C5%9Flemleri-009f4696be1f
-
 ## What This Project Does
 
 3 etcd nodes form a high availability cluster. 1 RKE2 node connects to that etcd cluster instead of using its own built-in etcd. When any single etcd node goes down, Raft quorum holds (2/3 majority) and Kubernetes keeps running without interruption.
@@ -351,5 +345,11 @@ project/
 └── README.md
 ```
 
+
+Sources:
+
+https://docs.rke2.io/install/quickstart
+https://etcd.io/docs/v3.5/install/
+https://medium.com/devopsturkiye/etcd-cluster-kurulumu-ve-backup-restore-i%CC%87%C5%9Flemleri-009f4696be1f
 
 

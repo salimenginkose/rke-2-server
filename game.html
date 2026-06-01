@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platformer with Timer Bonus</title>
+    <style>
+        body {
+            margin: 0;
+            background: #222;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        #game-container {
+            position: relative;
+        }
+        canvas {
+            background: #111;
+            border: 4px solid #444;
+            display: block;
+        }
+        #ui {
+            display: flex;
+            justify-content: space-between;
+            width: 800px;
+            margin-bottom: 10px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        #retry-btn {
+            display: none;
+            margin-top: 15px;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px #2e6930;
+        }
+        #retry-btn:hover {
+            background-color: #45a049;
+        }
+        #retry-btn:active {
+            box-shadow: 0 0 #2e6930;
+            transform: translateY(4px);
+        }
+        #leaderboard {
+            margin-top: 20px;
+            width: 300px;
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        ol {
+            padding-left: 20px;
+            text-align: left;
+        }
+        li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div id="level-display">Level: 1/5</div>
+        <div id="timer-display">Time: 300s</div>
+        <div id="score-display">Score: 0</div>
+    </div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+    </div>
+
+    <button id="retry-btn" onclick="resetGame()">Play Again ↻</button>
+
+    <div id="leaderboard">
+        <h3>Top Scores</h3>
+        <ol id="leaderboard-list"></ol>
+    </div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// Game State
+let currentLevel = 0;
+let score = 0;
+let gameActive = true;
+let timeLeft = 300; // 300 seconds per level
+let timerInterval;
+
+// Controls
+const keys = { right: false, left: false, up: false };
+
+// Player Object
+const player = {
+    x: 50,
+    y: 300,
+    width: 20,
+    height: 30,
+    velocityX: 0,
+    velocityY: 0,
+    speed: 4,
+    gravity: 0.5,
+    jumpForce: -10,
+    grounded: false
+};
+
+// 5 Levels Configuration
+const levels = [
+    {   // Level 1
+        platforms: [{x: 0, y: 380, w: 800, h: 20}, {x: 200, y: 280, w: 150, h: 15}, {x: 450, y: 200, w: 150, h: 15}],
+        baits: [{x: 260, y: 240, r: 8, collected: false}, {x: 520, y: 160, r: 8, collected: false}],
+        exit: {x: 720, y: 320, w: 40, h: 60, open: false}
+    },
+    {   // Level 2
+        platforms: [{x: 0, y: 380, w: 800, h: 20}, {x: 100, y: 300, w: 120, h: 15}, {x: 300, y: 220, w: 120, h: 15}, {x: 500, y: 150, w: 120, h: 15}],
+        baits: [{x: 150, y: 260, r: 8, collected: false}, {x: 350, y: 180, r: 8, collected: false}, {x: 550, y: 110, r: 8, collected: false}],
+        exit: {x: 720, y: 320, w: 40, h: 60, open: false}
+    },
+    {   // Level 3
+        platforms: [{x: 0, y: 380, w: 800, h: 20}, {x: 50, y: 250, w: 100, h: 15}, {x: 250, y: 280, w: 100, h: 15}, {x: 450, y: 220, w: 100, h: 15}, {x: 650, y: 160, w: 100, h: 15}],
+        baits: [{x: 90, y: 210, r: 8, collected: false}, {x: 290, y: 240, r: 8, collected: false}, {x: 490, y: 180, r: 8, collected: false}, {x: 690, y: 120, r: 8, collected: false}],
+        exit: {x: 20, y: 320, w: 40, h: 60, open: false}
+    },
+    {   // Level 4
+        platforms: [{x: 0, y: 380, w: 800, h: 20}, {x: 200, y: 300, w: 400, h: 15}, {x: 300, y: 200, w: 200, h: 15}],
+        baits: [{x: 250, y: 260, r: 8, collected: false}, {x: 550, y: 260, r: 8, collected: false}, {x: 350, y: 160, r: 8, collected: false}, {x: 450, y: 160, r: 8, collected: false}],
+        exit: {x: 720, y: 320, w: 40, h: 60, open: false}
+    },
+    {   // Level 5
+        platforms: [{x: 0, y: 380, w: 800, h: 20}, {x: 100, y: 300, w: 80, h: 15}, {x: 250, y: 230, w: 80, h: 15}, {x: 400, y: 160, w: 80, h: 15}, {x: 550, y: 230, w: 80, h: 15}, {x: 700, y: 300, w: 80, h: 15}],
+        baits: [{x: 130, y: 260, r: 8, collected: false}, {x: 280, y: 190, r: 8, collected: false}, {x: 430, y: 120, r: 8, collected: false}, {x: 580, y: 190, r: 8, collected: false}, {x: 730, y: 260, r: 8, collected: false}],
+        exit: {x: 420, y: 320, w: 40, h: 60, open: false}
+    }
+];
+
+let level;
+
+// Start the countdown timer function
+function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        if (gameActive) {
+            timeLeft--;
+            document.getElementById("timer-display").innerText = `Time: ${timeLeft}s`;
+            
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                gameOver(false); // Lost due to timeout
+            }
+        }
+    }, 1000);
+}
+
+// Keyboard Listeners
+window.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === "d") keys.right = true;
+    if (e.key === "ArrowLeft" || e.key === "a") keys.left = true;
+    if (e.key === "ArrowUp" || e.key === "w" || e.key === " ") keys.up = true;
+});
+
+window.addEventListener("keyup", (e) => {
+    if (e.key === "ArrowRight" || e.key === "d") keys.right = false;
+    if (e.key === "ArrowLeft" || e.key === "a") keys.left = false;
+    if (e.key === "ArrowUp" || e.key === "w" || e.key === " ") keys.up = false;
+});
+
+function update() {
+    if (!gameActive) return;
+
+    // Movement
+    if (keys.right) player.velocityX = player.speed;
+    else if (keys.left) player.velocityX = -player.speed;
+    else player.velocityX = 0;
+
+    if (keys.up && player.grounded) {
+        player.velocityY = player.jumpForce;
+        player.grounded = false;
+    }
+
+    // Apply Gravity
+    player.velocityY += player.gravity;
+
+    // Update Positions
+    player.x += player.velocityX;
+    player.y += player.velocityY;
+
+    // Canvas Boundaries
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+    // Platform Collisions
+    player.grounded = false;
+    for (let plat of level.platforms) {
+        if (player.x < plat.x + plat.w &&
+            player.x + player.width > plat.x &&
+            player.y + player.height <= plat.y + 10 && 
+            player.y + player.height + player.velocityY >= plat.y) {
+            
+            player.velocityY = 0;
+            player.y = plat.y - player.height;
+            player.grounded = true;
+        }
+    }
+
+    // Bait Collection
+    let allCollected = true;
+    for (let bait of level.baits) {
+        if (!bait.collected) {
+            if (bait.x > player.x && bait.x < player.x + player.width &&
+                bait.y > player.y && bait.y < player.y + player.height) {
+                bait.collected = true;
+                score += 10;
+                document.getElementById("score-display").innerText = "Score: " + score;
+            } else {
+                allCollected = false;
+            }
+        }
+    }
+
+    // Open exit if all baits are eaten
+    if (allCollected) {
+        level.exit.open = true;
+    }
+
+    // Exit Portal Collision
+    let exit = level.exit;
+    if (exit.open &&
+        player.x < exit.x + exit.w &&
+        player.x + player.width > exit.x &&
+        player.y < exit.y + exit.h &&
+        player.y + player.height > exit.y) {
+        
+        nextLevel();
+    }
+}
+
+function nextLevel() {
+    // Add remaining time directly into the score as bonus points
+    score += timeLeft;
+    document.getElementById("score-display").innerText = "Score: " + score;
+
+    currentLevel++;
+    if (currentLevel < levels.length) {
+        document.getElementById("level-display").innerText = `Level: ${currentLevel + 1}/5`;
+        level = JSON.parse(JSON.stringify(levels[currentLevel]));
+        
+        // Reset player & timer for next level
+        player.x = 50;
+        player.y = 300;
+        player.velocityX = 0;
+        player.velocityY = 0;
+        timeLeft = 300; 
+        document.getElementById("timer-display").innerText = `Time: ${timeLeft}s`;
+        startTimer();
+    } else {
+        gameOver(true); // Won the whole game
+    }
+}
+
+function gameOver(isWin) {
+    gameActive = false;
+    clearInterval(timerInterval);
+    
+    // Reveal the retry button
+    document.getElementById("retry-btn").style.display = "block";
+
+    if (isWin) {
+        // Wrap prompt in a slight timeout so the final canvas draw rendering finishes first
+        setTimeout(() => {
+            let name = prompt(`Congratulations! You beat the game! Final Score: ${score}. Enter your name:`, "Player");
+            if (!name) name = "Anonymous";
+
+            let leaderboard = JSON.parse(localStorage.getItem("platformer_leaderboard")) || [];
+            leaderboard.push({ name: name, score: score });
+            
+            leaderboard.sort((a, b) => b.score - a.score);
+            leaderboard = leaderboard.slice(0, 5);
+
+            localStorage.setItem("platformer_leaderboard", JSON.stringify(leaderboard));
+            displayLeaderboard();
+        }, 100);
+    }
+}
+
+function resetGame() {
+    // Hide retry button
+    document.getElementById("retry-btn").style.display = "none";
+    
+    // Reset core states
+    currentLevel = 0;
+    score = 0;
+    timeLeft = 300;
+    gameActive = true;
+
+    // Reset UI text layouts
+    document.getElementById("score-display").innerText = "Score: 0";
+    document.getElementById("level-display").innerText = "Level: 1/5";
+    document.getElementById("timer-display").innerText = "Time: 300s";
+
+    // Reclone levels data
+    level = JSON.parse(JSON.stringify(levels[currentLevel]));
+
+    // Reset Player coordinates
+    player.x = 50;
+    player.y = 300;
+    player.velocityX = 0;
+    player.velocityY = 0;
+
+    // Restart processes
+    startTimer();
+}
+
+function displayLeaderboard() {
+    let leaderboard = JSON.parse(localStorage.getItem("platformer_leaderboard")) || [];
+    const list = document.getElementById("leaderboard-list");
+    list.innerHTML = "";
+    
+    if (leaderboard.length === 0) {
+        list.innerHTML = "<li>No scores yet!</li>";
+    }
+
+    leaderboard.forEach(entry => {
+        let li = document.createElement("li");
+        li.innerText = `${entry.name}: ${entry.score} pts`;
+        list.appendChild(li);
+    });
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!gameActive) {
+        ctx.fillStyle = "#fff";
+        ctx.font = "30px Arial";
+        ctx.textAlign = "center";
+        if (timeLeft <= 0) {
+            ctx.fillText("TIME OUT! GAME OVER", canvas.width / 2, canvas.height / 2);
+        } else {
+            ctx.fillText("GAME OVER - YOU WIN!", canvas.width / 2, canvas.height / 2);
+        }
+        return;
+    }
+
+    // Draw Platforms
+    ctx.fillStyle = "#4CAF50";
+    for (let plat of level.platforms) {
+        ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+    }
+
+    // Draw Baits
+    ctx.fillStyle = "#FFD700";
+    for (let bait of level.baits) {
+        if (!bait.collected) {
+            ctx.beginPath();
+            ctx.arc(bait.x, bait.y, bait.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Draw Exit Portal
+    if (level.exit.open) {
+        ctx.fillStyle = "#00FFCC";
+    } else {
+        ctx.fillStyle = "#555";
+    }
+    ctx.fillRect(level.exit.x, level.exit.y, level.exit.w, level.exit.h);
+
+    // Draw Player
+    ctx.fillStyle = "#FF5722";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// Initialize First Run
+level = JSON.parse(JSON.stringify(levels[currentLevel]));
+displayLeaderboard();
+startTimer();
+loop();
+</script>
+
+</body>
+</html>
